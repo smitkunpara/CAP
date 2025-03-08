@@ -10,8 +10,28 @@
         "default_popup": "popup.html",
         "default_icon": "logo.png"
     },
-    "permissions": ["activeTab", "scripting", "storage"],
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage",
+        "identity",
+        "identity.email"
+    ],
+    "host_permissions": [
+        "http://localhost:8000/*",
+        "https://localhost:8000/*",
+        "http://127.0.0.1:8000/*",
+        "https://127.0.0.1:8000/*"
+    ],
+    "oauth2": {
+        "client_id": "382362045489-q7iek8ko5kr91vn8bnd7e8mq9o9322de.apps.googleusercontent.com",
+        "scopes": [
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile"
+        ]
+    },
     "content_security_policy": {
-        "extension_pages": "script-src 'self' http://localhost:* http://127.0.0.1:*; object-src 'self'"
+        "extension_pages": "script-src 'self'; object-src 'self'"
     }
 }

@@ -5,61 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Analyzer</title>
-    <style>
-        body {
-            width: 400px;
-            padding: 20px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .logo {
-            width: 32px;
-            height: 32px;
-        }
-
-        .title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1a73e8;
-            margin: 0;
-        }
-
-        .analyze-btn {
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        }
-
-        .analyze-btn:hover {
-            background-color: #1557b0;
-        }
-
-        .results {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 16px;
-            min-height: 100px;
-            display: none;
-        }
-    </style>
+    <link rel="stylesheet" href="popup.css">
     <script src="popup.js"></script>
 </head>
 
@@ -70,10 +16,19 @@
             <h1 class="title">Email Analyzer</h1>
         </div>
 
-        <button id="analyzeBtn" class="analyze-btn">Analyze Current Email</button>
+        <div id="loginSection" class="login-section">
+            <button id="loginBtn" class="login-btn">
+                <img src="google-logo.svg" alt="Google" class="google-logo">
+                Sign in with Google
+            </button>
+        </div>
 
-        <div id="results" class="results">
-            <!-- Analysis results will be displayed here -->
+        <div id="analyzerSection" class="analyzer-section" style="display: none;">
+            <button id="analyzeBtn" class="analyze-btn">Analyze Current Email</button>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+            <div id="results" class="results">
+                <!-- Analysis results will be displayed here -->
+            </div>
         </div>
     </div>
 </body>
