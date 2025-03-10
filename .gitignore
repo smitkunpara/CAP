@@ -3,3 +3,9 @@ venv/
 backend/.env
 /backend/tempCodeRunnerFile.py
 /.env
+ab.json
+token.pickle
+extra.py
+tempCodeRunnerFile.py
+get_refresh_token.py
+todo.txt

@@ -30,7 +30,7 @@ async def validate_token(token: str = Depends(get_current_user)) -> Dict:
 async def google_auth(request: dict) -> Dict:
     try:
         token = request.get('token')
-        
+        print("token:",token)
         if not token:
             raise HTTPException(status_code=400, detail="Token is required")
         response = requests.get(
