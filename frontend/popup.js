@@ -1,4 +1,5 @@
 let userToken = null;
+let refreshToken = null;
 
 // Function to validate JWT token
 async function isTokenValid(token) {
@@ -26,22 +27,55 @@ async function isTokenValid(token) {
     }
 }
 
+// Function to refresh the access token
+async function refreshAccessToken() {
+    try {
+        const response = await fetch("http://localhost:8000/auth/refresh", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to refresh token');
+        }
+
+        const data = await response.json();
+        return data.access_token;
+    } catch (error) {
+        console.error('Error refreshing token:', error);
+        throw error;
+    }
+}
+
 // Function to check authentication status
 async function checkAuthStatus() {
     try {
         const result = await new Promise(resolve => {
-            chrome.storage.local.get(['userToken'], resolve);
+            chrome.storage.local.get(['userToken', 'refreshToken'], resolve);
         });
 
         if (result.userToken) {
             const isValid = await isTokenValid(result.userToken);
             if (isValid) {
                 userToken = result.userToken;
+                refreshToken = result.refreshToken;
                 showAnalyzerSection();
                 return;
             } else {
-                // Token is invalid, clean up
-                await handleLogout();
+                // Try to refresh the token
+                try {
+                    const newAccessToken = await refreshAccessToken();
+                    userToken = newAccessToken;
+                    await chrome.storage.local.set({ userToken: newAccessToken });
+                    showAnalyzerSection();
+                    return;
+                } catch (error) {
+                    console.error('Failed to refresh token:', error);
+                    await handleLogout();
+                }
             }
         }
         // If we get here, either no token or invalid token
@@ -79,14 +113,19 @@ function handleLogin() {
             return;
         }
 
-        // Send the access token to your backend
-        fetch("http://localhost:8000/auth/google", {
-            method: "POST",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ token: accessToken })
-        })
+        // Get refresh token from Chrome identity API
+        chrome.identity.getProfileUserInfo(function(userInfo) {
+            // Send both access token and refresh token to your backend
+            fetch("http://localhost:8000/auth/google", {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    token: accessToken,
+                    refresh_token: userInfo.id // This is a simplified example, you'll need to get the actual refresh token
+                })
+            })
             .then(async response => {
                 if (!response.ok) {
                     const text = await response.text();
@@ -96,22 +135,27 @@ function handleLogin() {
             })
             .then(data => {
                 userToken = data.token;
-                // Store the token
-                chrome.storage.local.set({ userToken: data.token });
+                refreshToken = data.refresh_token;
+                // Store both tokens
+                chrome.storage.local.set({ 
+                    userToken: data.token,
+                    refreshToken: data.refresh_token
+                });
                 showAnalyzerSection();
             })
             .catch(error => {
                 console.error('Error during authentication:', error);
                 alert('Failed to authenticate. Please try again.');
             });
+        });
     });
 }
 
 // Update handleLogout to be async
 async function handleLogout() {
     return new Promise((resolve) => {
-        //remove token from local storage
-        chrome.storage.local.remove('userToken', () => {
+        //remove tokens from local storage
+        chrome.storage.local.remove(['userToken', 'refreshToken'], () => {
             hideAnalyzerSection();
             resolve();
         });
@@ -168,7 +212,7 @@ const analyzeEmail = () => {
                 }
                 return messageId;
             }
-        }, (results) => {
+        }, async (results) => {
             const messageId = results[0].result;
             
             if (!messageId) {
@@ -180,38 +224,54 @@ const analyzeEmail = () => {
                 return;
             }
 
-            fetch("http://localhost:8000/email", {
-                method: "POST",
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${userToken}`,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ email_id: messageId }),
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        // Token expired or invalid
-                        handleLogout();
+            try {
+                let response = await fetch("http://localhost:8000/email", {
+                    method: "POST",
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email_id: messageId }),
+                });
+
+                if (response.status === 401) {
+                    // Token expired, try to refresh
+                    try {
+                        const newAccessToken = await refreshAccessToken();
+                        userToken = newAccessToken;
+                        await chrome.storage.local.set({ userToken: newAccessToken });
+                        
+                        // Retry the request with new token
+                        response = await fetch("http://localhost:8000/email", {
+                            method: "POST",
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${newAccessToken}`,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ email_id: messageId }),
+                        });
+                    } catch (error) {
+                        // If refresh fails, logout user
+                        await handleLogout();
                         throw new Error('Authentication expired. Please login again.');
                     }
-                    return response.text().then(text => {
-                        throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
-                    });
                 }
-                return response.json();
-            })
-            .then(data => {
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+                }
+
+                const data = await response.json();
                 console.log('Analysis successful:', data);
                 // Format and display the results
                 resultsDiv.innerHTML = `
                     <h3>Analysis Results:</h3>
                     <pre>${JSON.stringify(data, null, 2)}</pre>
                 `;
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error analyzing email:', error);
                 resultsDiv.innerHTML = `
                     <p style="color: red;">
@@ -222,7 +282,7 @@ const analyzeEmail = () => {
                         <small>Check the console for more details (Right-click > Inspect)</small>
                     </p>
                 `;
-            });
+            }
         });
     });
 };

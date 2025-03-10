@@ -4,7 +4,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     JWT_SECRET: str
-
+    GOOGLE_REFRESH_TOKEN: str
+    oauth_token: str
+    
     class Config:
         env_file = ".env"
 
