@@ -4,21 +4,40 @@ from jose import jwt
 import requests
 from typing import Dict
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from database import db
+import datetime
+
     
 security = HTTPBearer()
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
+        if db.is_token_blacklisted(token):
+            raise HTTPException(status_code=401, detail="User is logged out")
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         return payload
-    except:
+    except Exception as e:
+        print(f"Error getting current user: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 router = APIRouter()
 
+@router.get("/logout")
+async def logout(token:HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = token.credentials
+        jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        # if db.is_token_blacklisted(token):
+        #     raise HTTPException(status_code=401, detail="User is already logged out")
+        # db.add_blacklisted_token(token)
+        return {"message": "Logged out successfully"}
+    except Exception as e:
+        print(f"Error logging out: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/validate")
-async def validate_token(token: str = Depends(get_current_user)) -> Dict:
+async def validate_token(user: str = Depends(get_current_user)) -> Dict:
     return {
         "status": "success",
         "valid": True,
@@ -44,23 +63,18 @@ async def google_auth(request: dict) -> Dict:
             
         user_info = response.json()
         
-        # Get refresh token from Chrome identity API
-        refresh_token = request.get('refresh_token')
-        
-        # Store tokens in your database (for now we'll just return them)
-        # In production, you should store these securely in your database
-        tokens = {
-            "access_token": token,
-            "refresh_token": refresh_token,
-            "expires_in": 3600  # Google OAuth tokens typically expire in 1 hour
-        }
+        db.add_user({
+            "name":user_info.get('name', ''),
+            "email":user_info['email'],
+            "sub":user_info['sub'],
+            "access_token":token,
+            "created_at":datetime.datetime.now()
+        })
         
         app_token = jwt.encode(
             {
                 "email": user_info['email'],
-                "name": user_info.get('name', ''),
-                "sub": user_info['sub'],
-                "tokens": tokens  # Include tokens in JWT
+                "name": user_info.get('name', '')
             },
             settings.JWT_SECRET,
             algorithm="HS256"
@@ -80,37 +94,4 @@ async def google_auth(request: dict) -> Dict:
         raise HTTPException(status_code=401, detail=f"Invalid Google token: {str(e)}")
     except Exception as e:
         print(f"Unexpected error during authentication: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/refresh")
-async def refresh_token(request: dict) -> Dict:
-    try:
-        refresh_token = request.get('refresh_token')
-        if not refresh_token:
-            raise HTTPException(status_code=400, detail="Refresh token is required")
-            
-        # Request new access token from Google
-        response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'client_id': settings.GOOGLE_CLIENT_ID,
-                'client_secret': settings.GOOGLE_CLIENT_SECRET,
-                'refresh_token': refresh_token,
-                'grant_type': 'refresh_token'
-            }
-        )
-        
-        if response.status_code != 200:
-            raise ValueError("Failed to refresh token")
-            
-        token_data = response.json()
-        
-        return {
-            "status": "success",
-            "access_token": token_data['access_token'],
-            "expires_in": token_data['expires_in']
-        }
-        
-    except Exception as e:
-        print(f"Error refreshing token: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

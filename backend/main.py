@@ -5,6 +5,7 @@ from auth import router as auth_router , get_current_user
 from models import EmailRequest
 from fetch_email import get_email_from_gmail
 
+
 app = FastAPI(title="Email Analyzer API")
 app.include_router(auth_router,prefix="/auth")
 
@@ -23,7 +24,8 @@ async def root():
 
 @app.post("/email")
 async def analyze_email(request: EmailRequest,userdata = Depends(get_current_user)):
-    return get_email_from_gmail(request.email_id)
+    print(request.email_id)
+    return get_email_from_gmail(user_email=userdata["email"],message_id=request.email_id)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

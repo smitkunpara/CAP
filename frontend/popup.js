@@ -1,10 +1,5 @@
-let userToken = null;
-let refreshToken = null;
-
-// Function to validate JWT token
 async function isTokenValid(token) {
     try {
-        console.log('Validating token...');
         const response = await fetch("http://localhost:8000/auth/validate", {
             method: "GET",
             headers: {
@@ -12,87 +7,63 @@ async function isTokenValid(token) {
                 'Content-Type': 'application/json'
             }
         });
-
         if (!response.ok) {
-            console.log('Token validation failed:', response.status);
+            let resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <p style="color: red;">
+                    Failed to validate token. Please try again later.
+                    <br>
+                    Error: ${response.status}
+                </p>
+            `;
             return false;
         }
-
-        const data = await response.json();
-        console.log('Token validation successful:', data);
         return true;
     } catch (error) {
-        console.error('Token validation error:', error);
+        let resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <p style="color: red;">
+                Failed to validate token. Please try again later.
+                <br>
+                Error: ${error.message}
+            </p>
+        `;
         return false;
     }
 }
 
-// Function to refresh the access token
-async function refreshAccessToken() {
-    try {
-        const response = await fetch("http://localhost:8000/auth/refresh", {
-            method: "POST",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ refresh_token: refreshToken })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to refresh token');
-        }
-
-        const data = await response.json();
-        return data.access_token;
-    } catch (error) {
-        console.error('Error refreshing token:', error);
-        throw error;
-    }
-}
-
-// Function to check authentication status
 async function checkAuthStatus() {
     try {
         const result = await new Promise(resolve => {
-            chrome.storage.local.get(['userToken', 'refreshToken'], resolve);
+            chrome.storage.local.get(['userToken'], resolve);
         });
 
         if (result.userToken) {
             const isValid = await isTokenValid(result.userToken);
             if (isValid) {
-                userToken = result.userToken;
-                refreshToken = result.refreshToken;
                 showAnalyzerSection();
                 return;
             } else {
-                // Try to refresh the token
-                try {
-                    const newAccessToken = await refreshAccessToken();
-                    userToken = newAccessToken;
-                    await chrome.storage.local.set({ userToken: newAccessToken });
-                    showAnalyzerSection();
-                    return;
-                } catch (error) {
-                    console.error('Failed to refresh token:', error);
-                    await handleLogout();
-                }
+                await handleLogout();
             }
         }
         // If we get here, either no token or invalid token
         hideAnalyzerSection();
     } catch (error) {
-        console.error('Auth status check error:', error);
+        let resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <p style="color: red;">
+                Failed to check auth status. Please try again later.
+                <br>
+                Error: ${error.message}
+            </p>
+        `;
         hideAnalyzerSection();
     }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Popup opened - checking auth status...');
-
-    // First check auth status before setting up UI
     await checkAuthStatus();
-
-    // Then setup button listeners
     const loginButton = document.getElementById('loginBtn');
     const analyzeButton = document.getElementById('analyzeBtn');
     const logoutButton = document.getElementById('logoutBtn');
@@ -108,7 +79,6 @@ function handleLogin() {
     }, function (accessToken) {
         if (chrome.runtime.lastError) {
             const errorMessage = chrome.runtime.lastError.message || 'Unknown error occurred';
-            console.error('Authentication error:', errorMessage);
             alert(`Authentication failed: ${errorMessage}`);
             return;
         }
@@ -122,8 +92,7 @@ function handleLogin() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ 
-                    token: accessToken,
-                    refresh_token: userInfo.id // This is a simplified example, you'll need to get the actual refresh token
+                    token: accessToken
                 })
             })
             .then(async response => {
@@ -134,12 +103,8 @@ function handleLogin() {
                 return response.json();
             })
             .then(data => {
-                userToken = data.token;
-                refreshToken = data.refresh_token;
-                // Store both tokens
                 chrome.storage.local.set({ 
                     userToken: data.token,
-                    refreshToken: data.refresh_token
                 });
                 showAnalyzerSection();
             })
@@ -151,15 +116,38 @@ function handleLogin() {
     });
 }
 
-// Update handleLogout to be async
 async function handleLogout() {
-    return new Promise((resolve) => {
-        //remove tokens from local storage
-        chrome.storage.local.remove(['userToken', 'refreshToken'], () => {
-            hideAnalyzerSection();
-            resolve();
+    try {
+        // Get the stored token
+        const result = await chrome.storage.local.get(['userToken']);
+        const userToken = result.userToken;
+
+        // Send logout request to backend
+        const response = await fetch('http://localhost:8000/auth/logout', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${userToken}`
+            }
         });
-    });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // If logout successful, remove tokens and update UI
+        await chrome.storage.local.remove(['userToken']);
+        hideAnalyzerSection();
+        alert('Logged out successfully');
+
+    } catch (error) {
+        resultsDiv.innerHTML = `
+            <p style="color: red;">
+                Failed to logout. Please try again later.
+                <br>
+                Error: ${error.message}
+            </p>
+        `;
+    }
 }
 
 function showAnalyzerSection() {
@@ -225,6 +213,8 @@ const analyzeEmail = () => {
             }
 
             try {
+                const result = await chrome.storage.local.get(['userToken']);
+                const userToken = result.userToken;
                 let response = await fetch("http://localhost:8000/email", {
                     method: "POST",
                     headers: {
@@ -234,45 +224,17 @@ const analyzeEmail = () => {
                     },
                     body: JSON.stringify({ email_id: messageId }),
                 });
-
-                if (response.status === 401) {
-                    // Token expired, try to refresh
-                    try {
-                        const newAccessToken = await refreshAccessToken();
-                        userToken = newAccessToken;
-                        await chrome.storage.local.set({ userToken: newAccessToken });
-                        
-                        // Retry the request with new token
-                        response = await fetch("http://localhost:8000/email", {
-                            method: "POST",
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${newAccessToken}`,
-                                'Accept': 'application/json'
-                            },
-                            body: JSON.stringify({ email_id: messageId }),
-                        });
-                    } catch (error) {
-                        // If refresh fails, logout user
-                        await handleLogout();
-                        throw new Error('Authentication expired. Please login again.');
-                    }
-                }
-
                 if (!response.ok) {
                     const text = await response.text();
                     throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
                 }
 
                 const data = await response.json();
-                console.log('Analysis successful:', data);
-                // Format and display the results
                 resultsDiv.innerHTML = `
                     <h3>Analysis Results:</h3>
                     <pre>${JSON.stringify(data, null, 2)}</pre>
                 `;
             } catch (error) {
-                console.error('Error analyzing email:', error);
                 resultsDiv.innerHTML = `
                     <p style="color: red;">
                         Failed to analyze email. Please try again later.

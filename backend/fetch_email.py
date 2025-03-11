@@ -3,7 +3,8 @@ from googleapiclient.discovery import build
 import base64
 import email
 import requests
-from backend.config import settings
+from config import settings
+from database import db
 
 def refresh_access_token(refresh_token):
     try:
@@ -22,15 +23,15 @@ def refresh_access_token(refresh_token):
         print(f'Error refreshing token: {error}')
         return None
 
-def get_email_from_gmail(message_id):
+def get_email_from_gmail(user_email,message_id):
     try:
         # Get refresh token from config
         refresh_token = settings.GOOGLE_REFRESH_TOKEN
-        
+        access_token = db.get_user_token(user_email)
         # First try with the current access token
         try:
             credentials = google.oauth2.credentials.Credentials(
-                token=settings.oauth_token,
+                token=access_token,
                 refresh_token=refresh_token,
                 token_uri="https://oauth2.googleapis.com/token",
                 client_id=settings.GOOGLE_CLIENT_ID,
@@ -55,8 +56,8 @@ def get_email_from_gmail(message_id):
             )
             service = build('gmail', 'v1', credentials=credentials)
             message = service.users().messages().get(userId='me', id=message_id, format='raw').execute()
-
-        # Process the email message
+            db.update_user_token(user_email,new_access_token)
+        
         msg_str = base64.urlsafe_b64decode(message['raw'].encode("utf-8"))
         email_msg = email.message_from_bytes(msg_str)
         print("Subject:", email_msg["Subject"])
@@ -72,5 +73,3 @@ def get_email_from_gmail(message_id):
     except Exception as error:
         print(f'An error occurred: {error}')
         return None
-
-# print(get_email_from_gmail("1957fe88782ffa39"))
