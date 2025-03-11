@@ -5,7 +5,6 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str
     JWT_SECRET: str
     GOOGLE_REFRESH_TOKEN: str
-    oauth_token: str
     DATABASE_URL: str
     DATABASE_NAME: str
     
