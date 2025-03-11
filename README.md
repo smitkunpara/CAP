@@ -49,6 +49,8 @@ pip install -r requirements.txt
    
    # JWT Configuration
    JWT_SECRET="your-secure-jwt-secret"
+   JWT_ALGORITHM="your-jwt-algorithm"
+   JWT_EXP_MINUTES="your-jwt-expiration-minutes"
    
    # MongoDB Configuration
    DATABASE_URL="your-mongodb-connection-string"

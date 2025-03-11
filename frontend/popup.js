@@ -136,6 +136,10 @@ async function handleLogout() {
 
         // If logout successful, remove tokens and update UI
         await chrome.storage.local.remove(['userToken']);
+        // remove the results div
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
         hideAnalyzerSection();
         alert('Logged out successfully');
 

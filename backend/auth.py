@@ -15,7 +15,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         token = credentials.credentials
         if db.is_token_blacklisted(token):
             raise HTTPException(status_code=401, detail="User is logged out")
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=settings.JWT_ALGORITHM)
         return payload
     except Exception as e:
         print(f"Error getting current user: {str(e)}")
@@ -27,10 +27,10 @@ router = APIRouter()
 async def logout(token:HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = token.credentials
-        jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-        # if db.is_token_blacklisted(token):
-        #     raise HTTPException(status_code=401, detail="User is already logged out")
-        # db.add_blacklisted_token(token)
+        jwt.decode(token, settings.JWT_SECRET, algorithms=settings.JWT_ALGORITHM)
+        if db.is_token_blacklisted(token):
+            raise HTTPException(status_code=401, detail="User is already logged out")
+        db.add_blacklisted_token(token)
         return {"message": "Logged out successfully"}
     except Exception as e:
         print(f"Error logging out: {str(e)}")
@@ -74,10 +74,11 @@ async def google_auth(request: dict) -> Dict:
         app_token = jwt.encode(
             {
                 "email": user_info['email'],
-                "name": user_info.get('name', '')
+                "name": user_info.get('name', ''),
+                "exp": datetime.datetime.now() + datetime.timedelta(minutes=settings.JWT_EXP_MINUTES)
             },
             settings.JWT_SECRET,
-            algorithm="HS256"
+            algorithm=settings.JWT_ALGORITHM
         )
         
         return {

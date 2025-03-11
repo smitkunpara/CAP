@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     GOOGLE_REFRESH_TOKEN: str
     DATABASE_URL: str
     DATABASE_NAME: str
+    JWT_ALGORITHM: str
+    JWT_EXP_MINUTES: int
     
     class Config:
         env_file = ".env"

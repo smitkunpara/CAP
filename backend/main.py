@@ -5,9 +5,7 @@ from auth import router as auth_router , get_current_user
 from models import EmailRequest
 from fetch_email import get_email_from_gmail
 
-
 app = FastAPI(title="Email Analyzer API")
-app.include_router(auth_router,prefix="/auth")
 
 # Enable CORS for the Chrome extension
 app.add_middleware(
@@ -17,6 +15,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router,prefix="/auth")
 
 @app.get("/")
 async def root():
