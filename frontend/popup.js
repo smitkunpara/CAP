@@ -7,33 +7,20 @@ async function isTokenValid(token) {
                 'Content-Type': 'application/json'
             }
         });
-        if (!response.ok) {
-            let resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = `
-                <p style="color: red;">
-                    Failed to validate token. Please try again later.
-                    <br>
-                    Error: ${response.status}
-                </p>
-            `;
-            return false;
+        if (response.ok) {
+            return true;
         }
-        return true;
+        return false;
     } catch (error) {
-        let resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = `
-            <p style="color: red;">
-                Failed to validate token. Please try again later.
-                <br>
-                Error: ${error.message}
-            </p>
-        `;
         return false;
     }
 }
 
 async function checkAuthStatus() {
     try {
+        // chrome.storage.local.set({
+        //     userToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InNtaXRrdW1hcl9rdW5wYXJhQHNybWFwLmVkdS5pbiIsIm5hbWUiOiJTbWl0a3VtYXIgS3VucGFyYSB8IEFQMjExMTAwMTEyNzUiLCJleHAiOjE3NDE4MDQ1NTR9.D2YPXsuhICLNZ-wyz7KlK-lssumKJHN-oHbdsX46-rw"
+        // });
         const result = await new Promise(resolve => {
             chrome.storage.local.get(['userToken'], resolve);
         });
@@ -44,7 +31,8 @@ async function checkAuthStatus() {
                 showAnalyzerSection();
                 return;
             } else {
-                await handleLogout();
+                // console.error("token is invalid");
+                await handleLogout(false);
             }
         }
         // If we get here, either no token or invalid token
@@ -84,57 +72,55 @@ function handleLogin() {
         }
 
         // Get refresh token from Chrome identity API
-        chrome.identity.getProfileUserInfo(function(userInfo) {
+        chrome.identity.getProfileUserInfo(function (userInfo) {
             // Send both access token and refresh token to your backend
             fetch("http://localhost:8000/auth/google", {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     token: accessToken
                 })
             })
-            .then(async response => {
-                if (!response.ok) {
-                    const text = await response.text();
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                chrome.storage.local.set({ 
-                    userToken: data.token,
+                .then(async response => {
+                    if (!response.ok) {
+                        const text = await response.text();
+                        throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    chrome.storage.local.set({
+                        userToken: data.token,
+                    });
+                    showAnalyzerSection();
+                })
+                .catch(error => {
+                    console.error('Error during authentication:', error);
+                    alert('Failed to authenticate. Please try again.');
                 });
-                showAnalyzerSection();
-            })
-            .catch(error => {
-                console.error('Error during authentication:', error);
-                alert('Failed to authenticate. Please try again.');
-            });
         });
     });
 }
 
-async function handleLogout() {
+async function handleLogout(sendrequest = true) {
     try {
         // Get the stored token
         const result = await chrome.storage.local.get(['userToken']);
         const userToken = result.userToken;
-
         // Send logout request to backend
-        const response = await fetch('http://localhost:8000/auth/logout', {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${userToken}`
+        if (sendrequest) {
+            const response = await fetch('http://localhost:8000/auth/logout', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${userToken}`
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        // If logout successful, remove tokens and update UI
         await chrome.storage.local.remove(['userToken']);
         // remove the results div
         const resultsDiv = document.getElementById('results');
@@ -144,13 +130,7 @@ async function handleLogout() {
         alert('Logged out successfully');
 
     } catch (error) {
-        resultsDiv.innerHTML = `
-            <p style="color: red;">
-                Failed to logout. Please try again later.
-                <br>
-                Error: ${error.message}
-            </p>
-        `;
+        console.error("error",error);
     }
 }
 
@@ -172,7 +152,7 @@ const analyzeEmail = () => {
     resultsDiv.innerHTML = 'Analyzing email...';
 
     // Get the current tab to access the URL
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         const activeTab = tabs[0];
         const url = activeTab.url;
 
@@ -206,7 +186,7 @@ const analyzeEmail = () => {
             }
         }, async (results) => {
             const messageId = results[0].result;
-            
+
             if (!messageId) {
                 resultsDiv.innerHTML = `
                     <p style="color: red;">
