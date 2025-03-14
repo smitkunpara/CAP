@@ -26,7 +26,7 @@
         "https://mail.google.com/*"
     ],
     "oauth2": {
-        "client_id": "382362045489-q7iek8ko5kr91vn8bnd7e8mq9o9322de.apps.googleusercontent.com",
+        "client_id": "382362045489-141n1g9t46cb0jsfldhqp9b27fmup49h.apps.googleusercontent.com",
         "scopes": [
             "openid",
             "https://www.googleapis.com/auth/userinfo.email",

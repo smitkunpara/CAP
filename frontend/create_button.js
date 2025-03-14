@@ -27,11 +27,11 @@ function injectButton() {
 
 function initObserver() {
     if (isEmailView()) {
-        setTimeout(injectButton, 100);
+        setTimeout(injectButton, 1000);
     }
     window.addEventListener('hashchange', () => {
         if (isEmailView()) {
-            setTimeout(injectButton, 100);
+            setTimeout(injectButton, 1000);
         }
     });
 }

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     DATABASE_NAME: str
     JWT_ALGORITHM: str
     JWT_EXP_MINUTES: int
+    GOOGLE_REDIRECT_URI: str
     
     class Config:
         env_file = ".env"

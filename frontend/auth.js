@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (loginButton) loginButton.addEventListener('click', handleLogin);
     if (analyzeButton) analyzeButton.addEventListener('click', () => {
-        // Send message to content script to analyze email
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
             chrome.tabs.sendMessage(tabs[0].id, {action: "analyzeEmail"});
         });
@@ -67,46 +66,82 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function handleLogin() {
-    chrome.identity.getAuthToken({
-        interactive: true
-    }, function (accessToken) {
-        if (chrome.runtime.lastError) {
-            const errorMessage = chrome.runtime.lastError.message || 'Unknown error occurred';
-            alert(`Authentication failed: ${errorMessage}`);
-            return;
-        }
+    const manifest = chrome.runtime.getManifest();
+    const clientId = manifest.oauth2.client_id;
+    const redirectUri = chrome.identity.getRedirectURL();
+    
+    console.log("Using redirect URI:", redirectUri);
+    
+    const scope = manifest.oauth2.scopes.join(" ");
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${clientId}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `response_type=code&` +
+    `scope=${encodeURIComponent(scope)}&` +
+    `access_type=offline&` +
+    `prompt=consent`;
+    
+    console.log("Auth URL:", authUrl);
+    
+    chrome.identity.launchWebAuthFlow(
+        {
+            url: authUrl,
+            interactive: true
+        },
+        function (redirectUrl) {
+            if (chrome.runtime.lastError) {
+                console.error("Chrome runtime error:", chrome.runtime.lastError);
+                alert(`Authentication failed: ${chrome.runtime.lastError.message}`);
+                return;
+            }
 
-        // Get refresh token from Chrome identity API
-        chrome.identity.getProfileUserInfo(function (userInfo) {
-            // Send both access token and refresh token to your backend
+            if (!redirectUrl) {
+                console.error("No redirect URL received");
+                alert("Authentication failed: No response from Google");
+                return;
+            }
+
+            // Extract authorization code from redirect URL
+            const urlParams = new URLSearchParams(new URL(redirectUrl).search);
+            const authCode = urlParams.get("code");
+
+            if (!authCode) {
+                console.error("No auth code in redirect URL:", redirectUrl);
+                alert("Failed to retrieve authorization code.");
+                return;
+            }
+
+            // Send authorization code to backend
             fetch("http://localhost:8000/auth/google", {
                 method: "POST",
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    token: accessToken
-                })
+                    code: authCode,
+                    redirect_uri: redirectUri  // Important: Send the same redirect URI used in the initial request
+                }),
             })
-                .then(async response => {
-                    if (!response.ok) {
-                        const text = await response.text();
-                        throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    chrome.storage.local.set({
-                        userToken: data.token,
-                    });
-                    showAnalyzerSection();
-                })
-                .catch(error => {
-                    console.error('Error during authentication:', error);
-                    alert('Failed to authenticate. Please try again.');
+            .then(async (response) => {
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+                }
+                return response.json();
+            })
+            .then((data) => {
+                chrome.storage.local.set({
+                    userToken: data.jwt_token
                 });
-        });
-    });
+                showAnalyzerSection();
+                alert("Login successful!");
+            })
+            .catch((error) => {
+                console.error("Error during authentication:", error);
+                alert("Failed to authenticate. Please try again.");
+            });
+        }
+    );
 }
 
 async function handleLogout(sendrequest = true) {
