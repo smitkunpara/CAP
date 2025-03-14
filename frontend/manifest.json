@@ -43,6 +43,7 @@
                 "*://mail.google.com/*"
             ],
             "js": [
+                "analyze_email.js",
                 "create_button.js"
             ],
             "run_at": "document_end"

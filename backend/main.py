@@ -7,10 +7,10 @@ from fetch_email import get_email_from_gmail
 
 app = FastAPI(title="Email Analyzer API")
 
-# Enable CORS for the Chrome extension
+# Enable CORS for the Chrome extension and Gmail
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*"],
+    allow_origins=["chrome-extension://*", "https://mail.google.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

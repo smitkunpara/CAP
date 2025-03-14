@@ -57,7 +57,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const logoutButton = document.getElementById('logoutBtn');
 
     if (loginButton) loginButton.addEventListener('click', handleLogin);
-    if (analyzeButton) analyzeButton.addEventListener('click', analyzeEmail);
+    if (analyzeButton) analyzeButton.addEventListener('click', () => {
+        // Send message to content script to analyze email
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "analyzeEmail"});
+        });
+    });
     if (logoutButton) logoutButton.addEventListener('click', handleLogout);
 });
 
@@ -144,91 +149,3 @@ function hideAnalyzerSection() {
     document.getElementById('analyzerSection').style.display = 'none';
 }
 
-const analyzeEmail = () => {
-    const resultsDiv = document.getElementById('results');
-
-    // Show the results div
-    resultsDiv.style.display = 'block';
-    resultsDiv.innerHTML = 'Analyzing email...';
-
-    // Get the current tab to access the URL
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        const activeTab = tabs[0];
-        const url = activeTab.url;
-
-        // Check if we're on Gmail
-        if (!url.includes('mail.google.com')) {
-            resultsDiv.innerHTML = `
-                <p style="color: red;">
-                    Please open a Gmail email to analyze.
-                </p>
-            `;
-            return;
-        }
-
-        // Execute script in the context of the Gmail page to get the message ID
-        chrome.scripting.executeScript({
-            target: { tabId: activeTab.id },
-            func: () => {
-                let messageId = null;
-                // Try first selector
-                let v1 = document.querySelector("#\\:1 > div > div:nth-child(3) > div > div.nH.a98.iY > div:nth-child(1) > div > div:nth-child(2) > div.ha > h2");
-                if (v1) {
-                    messageId = v1.getAttribute("data-legacy-thread-id");
-                } else {
-                    // Try second selector
-                    let v2 = document.querySelector("#\\:1 > div > div:nth-child(1) > div > div.nH.a98.iY > div:nth-child(1) > div > div:nth-child(2) > div.ha > h2");
-                    if (v2) {
-                        messageId = v2.getAttribute("data-legacy-thread-id");
-                    }
-                }
-                return messageId;
-            }
-        }, async (results) => {
-            const messageId = results[0].result;
-
-            if (!messageId) {
-                resultsDiv.innerHTML = `
-                    <p style="color: red;">
-                        Could not find email ID. Please make sure you're viewing a specific email in Gmail.
-                    </p>
-                `;
-                return;
-            }
-
-            try {
-                const result = await chrome.storage.local.get(['userToken']);
-                const userToken = result.userToken;
-                let response = await fetch("http://localhost:8000/email", {
-                    method: "POST",
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${userToken}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ email_id: messageId }),
-                });
-                if (!response.ok) {
-                    const text = await response.text();
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
-                }
-
-                const data = await response.json();
-                resultsDiv.innerHTML = `
-                    <h3>Analysis Results:</h3>
-                    <pre>${JSON.stringify(data, null, 2)}</pre>
-                `;
-            } catch (error) {
-                resultsDiv.innerHTML = `
-                    <p style="color: red;">
-                        Failed to analyze email. Please try again later.
-                        <br>
-                        Error: ${error.message}
-                        <br>
-                        <small>Check the console for more details (Right-click > Inspect)</small>
-                    </p>
-                `;
-            }
-        });
-    });
-};
