@@ -240,6 +240,7 @@ def analyze_email(email: EmailData):
     report["sender"] = analyze_sender(email["sender"])
     report["subject"] = analyze_subject(email["subject"])
     report["body"] = analyze_body_content(email["body"])
+    report["original_body"] = email["body"]
     
     # Overall risk assessment
     risk_level = "low"
