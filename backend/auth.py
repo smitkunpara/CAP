@@ -88,9 +88,9 @@ async def google_auth(request: dict) -> Dict:
 
         user_info = userinfo_response.json()
         if db.get_user(user_info["email"]):
-            db.update_user_token(user_info["email"],access_token,refresh_token)
+            user_id=db.update_user_token(user_info["email"],access_token,refresh_token)
         else:
-            db.add_user({
+            user_id= db.add_user({
                 "name": user_info.get("name", ""),
                 "email": user_info["email"],    
                 "sub": user_info["sub"],
@@ -99,11 +99,15 @@ async def google_auth(request: dict) -> Dict:
                 "created_at": datetime.datetime.now(),
             })
 
+        # Convert ObjectId to string for JSON serialization
+        user_id = str(user_id)
+
         # Generate app-specific JWT token for the user
         app_token = jwt.encode(
             {
                 "email": user_info["email"],
                 "name": user_info.get("name", ""),
+                "user_id": user_id,
                 "exp": datetime.datetime.now() + datetime.timedelta(minutes=60),
             },
             settings.JWT_SECRET,

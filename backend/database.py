@@ -22,18 +22,35 @@ class DataBase:
         return self.db.blacklistedtokens.find_one({"token": token}) is not None
     
     def add_user(self, user_data):
-        self.db.users.insert_one(user_data)
-    
+        result = self.db.users.insert_one(user_data)
+        return result.inserted_id
+        
     def get_user(self, email):
         return self.db.users.find_one({"email": email})
     
-    def update_user_token(self, email, token,refresh_token):
-        self.db.users.update_one({"email": email}, {"$set": {"access_token": token,"refresh_token":refresh_token}})
+    def update_user_token(self, email, token, refresh_token):
+        result = self.db.users.update_one({"email": email}, {"$set": {"access_token": token, "refresh_token": refresh_token}})
+        if result.matched_count > 0:
+            return self.db.users.find_one({"email": email})["_id"]
+        return None
     
-    def add_user_email_analysis(self,user_id,email_analysis):#verify this funtion
+    def add_user_email_analysis(self,user_id,email_analysis):
         self.db.users.insert_one({"user_id":ObjectId(user_id), "email_analysis":email_analysis})
     
-    def get_user_email_analysis(self,user_id):#verify this funtion
+    def get_user_email_analysis(self,user_id):
         return self.db.users.find({"user_id": ObjectId(user_id)})
+    
+    def add_email_analysis(self, user_id, email_analysis):
+        self.db.email_analysis.insert_one({"user_id": ObjectId(user_id), "email_analysis": email_analysis})
+        
+    def get_email_analysis(self, email_id):
+        return self.db.email_analysis.find_one({"_id": ObjectId(email_id)})
+    
+    def get_all_user_emails(self, user_id):
+        user_emails= self.db.email_analysis.find({"user_id": ObjectId(user_id)})
+        email_ids = []
+        for email in user_emails:
+            email_ids.append({"_id": str(email["_id"]), "subject": email["email_analysis"]["subject"]["subject"]})
+        return email_ids
 
 db=DataBase()

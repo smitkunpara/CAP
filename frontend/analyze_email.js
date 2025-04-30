@@ -8,6 +8,7 @@ const get_mail_id = () => {
         if (v2) {
             messageId = v2.getAttribute("data-legacy-thread-id");
         }
+        
     }
     return messageId;
 }
