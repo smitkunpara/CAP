@@ -252,6 +252,11 @@ def analyze_email(email: EmailData):
         risk_level = "medium"
     elif report["sender"].get("suspicious", False):
         risk_level = "medium"
+    elif report["links"]:
+        for link in report["links"]:
+            if link.get("phishing", False):
+                risk_level = "high"
+                break
         
     report["risk_level"] = risk_level
     

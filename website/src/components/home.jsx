@@ -1,10 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../styles/home.css';
 import { SuccessNotification, ErrorNotification } from './notification';
 import googleLogo from '../assets/google.svg';
 
 const Home = () => {
     const [showLoginModal, setShowLoginModal] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const navigate = useNavigate();
+
+    // Check if user is logged in on component mount
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Validate token with backend
+            fetch('http://localhost:8000/auth/validate', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.valid) {
+                    setIsLoggedIn(true);
+                } else {
+                    // If token is invalid, remove it
+                    localStorage.removeItem('token');
+                }
+            })
+            .catch(error => {
+                console.error('Token validation error:', error);
+                localStorage.removeItem('token');
+            });
+        }
+    }, []);
 
     const handleLoginClick = () => {
         setShowLoginModal(true);
@@ -14,15 +43,106 @@ const Home = () => {
         setShowLoginModal(false);
     };
 
+    const handleViewAnalysis = () => {
+        navigate('/emails');
+    };
+
+    const handleLogout = () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            fetch('http://localhost:8000/auth/logout', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(() => {
+                localStorage.removeItem('token');
+                setIsLoggedIn(false);
+                SuccessNotification('Logged out successfully');
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+                ErrorNotification('Failed to logout');
+            });
+        }
+    };
+
     const handleGoogleLogin = () => {
-        // Will be implemented in the backend later
-        SuccessNotification("Login feature will be available soon!");
-        closeModal();
+        // Google OAuth configuration with your actual client ID
+        const clientId = '382362045489-uboihipspfukf9ahhlb4rpun0ncgjpgk.apps.googleusercontent.com';
+        
+        // Make sure this exactly matches one of your authorized redirect URIs
+        const redirectUri = 'http://localhost:5173/oauth/callback';
+        
+        const scope = 'email profile';
+        
+        // Create Google OAuth URL
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+        
+        // Open Google auth in a new window
+        const authWindow = window.open(authUrl, '_blank', 'width=500,height=600');
+        
+        // Remove any existing event listeners to prevent duplicates
+        window.removeEventListener('message', handleOAuthMessage);
+        
+        // Create a named function for the event listener so we can remove it later
+        function handleOAuthMessage(event) {
+            if (event.origin !== window.location.origin) return;
+            
+            console.log("Received message:", event.data);
+            
+            if (event.data.type === 'oauth-response' && event.data.code) {
+                console.log("Received auth code:", event.data.code);
+                
+                // Remove the event listener once we've received the response
+                window.removeEventListener('message', handleOAuthMessage);
+                
+                // Exchange the code for a token using the website-specific endpoint
+                fetch('http://localhost:8000/auth/web/google', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: event.data.code,
+                        redirect_uri: redirectUri
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            console.error('Login error response:', text);
+                            throw new Error('Login failed');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Login response:", data);
+                    if (data.jwt_token) {
+                        localStorage.setItem('token', data.jwt_token);
+                        setIsLoggedIn(true);
+                        SuccessNotification('Logged in successfully');
+                        closeModal();
+                    } else {
+                        ErrorNotification('Login failed: No token received');
+                    }
+                })
+                .catch(error => {
+                    console.error('Login error:', error);
+                    ErrorNotification(`Login failed: ${error.message}`);
+                });
+            }
+        }
+        
+        // Add the event listener
+        window.addEventListener('message', handleOAuthMessage);
     };
 
     const handleDownload = () => {
         // Download extension from the API
-        window.location.href = 'http://localhost:3000/emailshild';
+        window.location.href = 'http://localhost:8000/emailshild';
         SuccessNotification("Extension download started!");
     };
 
@@ -31,11 +151,18 @@ const Home = () => {
             {/* Navigation Bar */}
             <nav className="navbar">
                 <div className="logo-container">
-                    <img src="src\assets\logo.svg" alt="Inbox Shield Logo" className="logo" />
+                    <img src="src/assets/logo.svg" alt="Inbox Shield Logo" className="logo" />
                     <h1>Inbox Shield</h1>
                 </div>
                 <div className="nav-links">
-                    <button className="login-button" onClick={handleLoginClick}>Login / Sign up</button>
+                    {isLoggedIn ? (
+                        <>
+                            <button className="view-analysis-button" onClick={handleViewAnalysis}>View Analysis</button>
+                            <button className="logout-button" onClick={handleLogout}>Logout</button>
+                        </>
+                    ) : (
+                        <button className="login-button" onClick={handleLoginClick}>Login / Sign up</button>
+                    )}
                 </div>
             </nav>
 
@@ -47,7 +174,7 @@ const Home = () => {
                     <button className="cta-button" onClick={handleDownload}>Download Extension</button>
                 </div>
                 <div className="hero-image">
-                    <img src="src\assets\phising_mail.png" alt="Email Protection" />
+                    <img src="src/assets/phising_mail.png" alt="Email Protection" />
                 </div>
             </section>
 
@@ -56,12 +183,12 @@ const Home = () => {
                 <h2>How Inbox Shield Protects You</h2>
                 <div className="feature-cards">
                     <div className="feature-card">
-                        <img src="src\assets\email_analysis.jpg" alt="Email Analysis" />
+                        <img src="src/assets/email_analysis.jpg" alt="Email Analysis" />
                         <h3>Email Analysis</h3>
                         <p>Our AI examines email content to detect suspicious patterns and language commonly used in phishing attempts.</p>
                     </div>
                     <div className="feature-card">
-                        <img src="src\assets\url scanning.jpeg" alt="URL Scanning" />
+                        <img src="src/assets/url scanning.jpeg" alt="URL Scanning" />
                         <h3>URL Scanning</h3>
                         <p>We automatically check all links in your emails against our database of known phishing URLs and analyze suspicious ones.</p>
                     </div>
@@ -105,7 +232,7 @@ const Home = () => {
             <footer className="footer">
                 <div className="footer-content">
                     <div className="footer-logo">
-                        <img src="src\assets\logo.svg" alt="Inbox Shield Logo" className="logo-small" />
+                        <img src="src/assets/logo.svg" alt="Inbox Shield Logo" className="logo-small" />
                         <p>Inbox Shield</p>
                     </div>
                     <div className="footer-links">

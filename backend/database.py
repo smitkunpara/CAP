@@ -1,6 +1,8 @@
 import pymongo
 from config import settings
 from bson.objectid import ObjectId
+from bson.json_util import dumps, loads
+import json
 
 class DataBase:
     def __init__(self) -> None:
@@ -44,7 +46,16 @@ class DataBase:
         self.db.email_analysis.insert_one({"user_id": ObjectId(user_id), "email_analysis": email_analysis})
         
     def get_email_analysis(self, email_id):
-        return self.db.email_analysis.find_one({"_id": ObjectId(email_id)})
+        # Find the document
+        result = self.db.email_analysis.find_one({"_id": ObjectId(email_id)})
+        
+        # Convert to JSON serializable format
+        if result:
+            # Convert ObjectId to string and return a new dict
+            result["_id"] = str(result["_id"])
+            result["user_id"] = str(result["user_id"])
+            return result
+        return None
     
     def get_all_user_emails(self, user_id):
         user_emails= self.db.email_analysis.find({"user_id": ObjectId(user_id)})

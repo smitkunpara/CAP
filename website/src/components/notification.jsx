@@ -1,31 +1,37 @@
-import { toast,Bounce } from "react-toastify";
+import { toast } from 'react-toastify';
 
-const SuccessNotification = (message) => {
-    toast.success(message, {
-        position: "top-center",
-        autoClose: 2000,
-        theme: "colored",
-        transition: Bounce,
-        });
-    };
+export const SuccessNotification = (message) => {
+  toast.success(message, {
+    position: "top-right",
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+  });
+};
 
-const ErrorNotification = (message) => {
-    toast.error(message, {
-        position: "top-center",
-        autoClose: 2000,
-        theme: "colored",
-        transition: Bounce,
-        });
-    }
-const WarningNotification = (message) => {
-    toast.warn(message, {
-        position: "top-center",
-        autoClose: 2000,
-        theme: "colored",
-        transition: Bounce,
-        });
-    }
+export const ErrorNotification = (message) => {
+  toast.error(message, {
+    position: "top-right",
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+  });
+};
 
-
-
-export {SuccessNotification,ErrorNotification,WarningNotification};
+export const InfoNotification = (message) => {
+  toast.info(message, {
+    position: "top-right",
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+  });
+};

@@ -45,6 +45,11 @@ body {
   font-weight: 700;
 }
 
+.nav-links {
+  display: flex;
+  gap: 1rem;
+}
+
 .login-button {
   background-color: #4285F4;
   color: #ffffff;
@@ -58,6 +63,36 @@ body {
 
 .login-button:hover {
   background-color: #3367d6;
+}
+
+.view-analysis-button {
+  background-color: #4285F4;
+  color: #ffffff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.view-analysis-button:hover {
+  background-color: #3367d6;
+}
+
+.logout-button {
+  background-color: #ea4335;
+  color: #ffffff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.logout-button:hover {
+  background-color: #d33426;
 }
 
 /* Hero Section */

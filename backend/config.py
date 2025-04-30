@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_EXP_MINUTES: int
     GOOGLE_REDIRECT_URI: str
+    WEBSITE_GOOGLE_CLIENT_ID: str
+    WEBSITE_GOOGLE_CLIENT_SECRET: str
     
     class Config:
         env_file = ".env"
